@@ -5,6 +5,16 @@ pub struct Sender<T> {
     inner: Arc<Inner<T>>,
 }
 
+//implement clone for Sender
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        Sender {
+            //clone the Arc not the thing inside the arc
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
 impl<T> Sender<T> {
     pub fn send(&mut self, t: T) {
         //take the lock
@@ -68,4 +78,15 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
             inner: inner.clone(),
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn ping_pong() {
+        let (mut tx, mut rx) = channel();
+        tx.send(43);
+        assert_eq!(rx.recv(), 43);
+    }
 }

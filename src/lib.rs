@@ -8,7 +8,7 @@ pub struct Sender<T> {
 impl<T> Sender<T> {
     pub fn send(&mut self, t: T) {
         //take the lock
-        let queue = self.inner.queue.lock().unwrap();
+        let mut queue = self.inner.queue.lock().unwrap();
         //add to the queue
         queue.push_back(t);
         //let go of the lock as it needs to be passed to any
@@ -26,17 +26,18 @@ pub struct Receiver<T> {
 impl<T> Receiver<T> {
     pub fn recv(&mut self) -> T {
         //take the lock
-        let queue = self.inner.queue.lock().unwrap();
+        let mut queue = self.inner.queue.lock().unwrap();
         loop {
-        //take from the queue
-        //use condvar to implement blocking
-        match queue.pop_front() {
-            Some(t) => return t,
-            None => {
-                //sleep the thread until we need to recieve
-                self.inner.available.wait(queue).unwrap();
+            //take from the queue
+            //use condvar to implement blocking
+            match queue.pop_front() {
+                Some(t) => return t,
+                None => {
+                    //sleep the thread until we need to recieve
+                    //hand over the lock since we have been woken
+                    queue = self.inner.available.wait(queue).unwrap();
+                }
             }
-        }
         }
     }
 }
@@ -55,7 +56,8 @@ struct Inner<T> {
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Inner {
         queue: Mutex::default(),
-=    };
+        available: Condvar::new(),
+    };
 
     let inner = Arc::new(inner);
     (
